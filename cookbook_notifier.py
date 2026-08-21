@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -36,6 +37,7 @@ CYCLE_DAY_ADJUSTMENT = 1
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 EMAIL_TO = ["jfrolfes@gmail.com"]#, "clay-smith10@outlook.com"]
+MOUNTAIN_TZ = ZoneInfo("America/Denver")  # handles MST/MDT transitions automatically
 
 
 def fetch_cycle_rows():
@@ -104,6 +106,21 @@ def format_day_range(current_date):
     )
 
 
+def format_day_range_mt(current_date):
+    """Format the same cycle window converted to Mountain Time (MST/MDT-aware)."""
+    start = datetime(
+        current_date.year, current_date.month, current_date.day, 1, 0, tzinfo=timezone.utc
+    ).astimezone(MOUNTAIN_TZ)
+    end = (
+        datetime(current_date.year, current_date.month, current_date.day, 0, 59, tzinfo=timezone.utc)
+        + timedelta(days=1)
+    ).astimezone(MOUNTAIN_TZ)
+    return (
+        f"{format_month_day(start.date())}, {start.strftime('%-I:%M %p')} {start.tzname()} - "
+        f"{format_month_day(end.date())}, {end.strftime('%-I:%M %p')} {end.tzname()}"
+    )
+
+
 def format_recipe(recipe):
     inputs = f"{recipe['qty1']}x {recipe['input1']}"
     if recipe["input2"]:
@@ -118,6 +135,7 @@ def build_email_body(recipes_by_day, day1_date, start_date, num_days=7):
         day_num = cycle_day_for_date(current_date, day1_date)
         label = "Today" if i == 0 else current_date.strftime("%A")
         lines.append(f"{label} ({format_day_range(current_date)}) - Cycle Day {day_num}")
+        lines.append(f"  MT: {format_day_range_mt(current_date)}")
         for recipe in recipes_by_day.get(day_num, []):
             lines.append(f"  - {format_recipe(recipe)}")
         lines.append("")
@@ -166,6 +184,7 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
                 </tr>
               </table>
               <div style="font-size:12px;color:#6b7280;margin-top:2px;">{escape(format_day_range(current_date))}</div>
+              <div style="font-size:12px;color:#6b7280;">MT: {escape(format_day_range_mt(current_date))}</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
                 {rows_html}
               </table>
