@@ -190,7 +190,7 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
 """
 
 
-def send_email(subject, text_body, html_body, to_addr):
+def send_email(subject, text_body, html_body, to_addrs):
     smtp_host = os.environ.get("SMTP_HOST", SMTP_HOST)
     smtp_port = int(os.environ.get("SMTP_PORT", SMTP_PORT))
     smtp_username = os.environ["EMAIL_USERNAME"]
@@ -200,18 +200,19 @@ def send_email(subject, text_body, html_body, to_addr):
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
-    msg["To"] = to_addr
+    msg["To"] = ", ".join(to_addrs)
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
     with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.starttls()
         server.login(smtp_username, smtp_password)
-        server.sendmail(from_addr, [to_addr], msg.as_string())
+        server.sendmail(from_addr, to_addrs, msg.as_string())
 
 
 def main():
-    to_addr = os.environ.get("EMAIL_TO", EMAIL_TO)
+    env_to = os.environ.get("EMAIL_TO")
+    to_addrs = [addr.strip() for addr in env_to.split(",")] if env_to else EMAIL_TO
     today = datetime.now(timezone.utc).date()
 
     rows = fetch_cycle_rows()
@@ -220,7 +221,7 @@ def main():
     html_body = build_email_html(recipes_by_day, day1_date, today, num_days=7)
 
     subject = f"Newton's Cookbook - {today.isoformat()} + next 6 days"
-    send_email(subject, text_body, html_body, to_addr)
+    send_email(subject, text_body, html_body, to_addrs)
     print(text_body)
     return 0
 
