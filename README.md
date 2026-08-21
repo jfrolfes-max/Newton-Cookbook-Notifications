@@ -12,19 +12,25 @@ each recipe's inputs/quantities and output/quantity.
 ## Setup
 
 1. `pip install -r requirements.txt`
-2. Export your SMTP credentials as environment variables (a Gmail App Password works well with
-   the default `smtp.gmail.com` host): `SMTP_USERNAME`, `SMTP_PASSWORD`. These are the only
-   values you need to set — SMTP host/port and the recipient address are already set as
-   defaults in `cookbook_notifier.py` and can be overridden via `SMTP_HOST`, `SMTP_PORT`, or
-   `EMAIL_TO` env vars if needed.
-3. Run it:
+2. Run it, passing your email credentials (a Gmail App Password works well with the default
+   `smtp.gmail.com` host) inline on the command: `EMAIL_USERNAME`, `EMAIL_PASSWORD`. These are
+   the only values you need to set — SMTP host/port and the recipient address are already set
+   as defaults in `cookbook_notifier.py` and can be overridden via `SMTP_HOST`, `SMTP_PORT`, or
+   `EMAIL_TO` if needed.
 
    ```bash
-   export SMTP_USERNAME=your-account@gmail.com
-   export SMTP_PASSWORD=your-app-password
-   python cookbook_notifier.py
+   EMAIL_USERNAME=your-account@gmail.com EMAIL_PASSWORD=your-app-password python cookbook_notifier.py
    ```
 
-A GitHub Actions workflow ([.github/workflows/daily-email.yml](.github/workflows/daily-email.yml))
-is included to run this automatically once a day using repository secrets
-(`SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`).
+## Running on a schedule
+
+Keep credentials out of the crontab itself by using the included `run_notifier.sh` wrapper,
+which loads them from a `secrets.env` file next to it:
+
+1. `cp secrets.env.example secrets.env` and fill in your real `EMAIL_USERNAME`/`EMAIL_PASSWORD`.
+2. `chmod 600 secrets.env` so only your user can read it (it's already git-ignored).
+3. Add a crontab entry that just calls the wrapper, e.g. to run daily at 9am:
+
+   ```cron
+   0 9 * * * /path/to/run_notifier.sh >> /path/to/cookbook_notifier.log 2>&1
+   ```

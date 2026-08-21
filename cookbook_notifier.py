@@ -25,7 +25,7 @@ CSV_URL = (
 )
 
 # Non-secret defaults, overridable via environment variables. Credentials
-# (SMTP_USERNAME / SMTP_PASSWORD) are intentionally NOT hardcoded here and
+# (EMAIL_USERNAME / EMAIL_PASSWORD) are intentionally NOT hardcoded here and
 # must always be supplied via environment variables / CI secrets.
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -106,8 +106,8 @@ def build_email_body(recipes_by_day, day1_date, start_date, num_days=7):
 def send_email(subject, body, to_addr):
     smtp_host = os.environ.get("SMTP_HOST", SMTP_HOST)
     smtp_port = int(os.environ.get("SMTP_PORT", SMTP_PORT))
-    smtp_username = os.environ["SMTP_USERNAME"]
-    smtp_password = os.environ["SMTP_PASSWORD"]
+    smtp_username = os.environ["EMAIL_USERNAME"]
+    smtp_password = os.environ["EMAIL_PASSWORD"]
     from_addr = os.environ.get("EMAIL_FROM", smtp_username)
 
     msg = MIMEText(body)
