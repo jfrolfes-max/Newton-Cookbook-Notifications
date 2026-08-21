@@ -35,7 +35,7 @@ CYCLE_DAY_ADJUSTMENT = 1
 # must always be supplied via environment variables / CI secrets.
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL_TO = ["jfrolfes@gmail.com", "clay-smith10@outlook.com"]
+EMAIL_TO = ["jfrolfes@gmail.com"]#, "clay-smith10@outlook.com"]
 
 
 def fetch_cycle_rows():
@@ -90,6 +90,20 @@ def cycle_day_for_date(target_date, day1_date):
     return (day_num - 1) % CYCLE_LENGTH_DAYS + 1
 
 
+def format_month_day(d):
+    """Format a date as 'Month Day', e.g. 'August 21' (no year, no leading zero)."""
+    return f"{d:%B} {d.day}"
+
+
+def format_day_range(current_date):
+    """Format the UTC window a cycle day covers, e.g. 'August 21, 1:00 AM UTC - August 22, 12:59 AM UTC'."""
+    next_date = current_date + timedelta(days=1)
+    return (
+        f"{format_month_day(current_date)}, 1:00 AM UTC - "
+        f"{format_month_day(next_date)}, 12:59 AM UTC"
+    )
+
+
 def format_recipe(recipe):
     inputs = f"{recipe['qty1']}x {recipe['input1']}"
     if recipe["input2"]:
@@ -103,7 +117,7 @@ def build_email_body(recipes_by_day, day1_date, start_date, num_days=7):
         current_date = start_date + timedelta(days=i)
         day_num = cycle_day_for_date(current_date, day1_date)
         label = "Today" if i == 0 else current_date.strftime("%A")
-        lines.append(f"{label} ({current_date.isoformat()}) - Cycle Day {day_num}")
+        lines.append(f"{label} ({format_day_range(current_date)}) - Cycle Day {day_num}")
         for recipe in recipes_by_day.get(day_num, []):
             lines.append(f"  - {format_recipe(recipe)}")
         lines.append("")
@@ -151,7 +165,7 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
                              padding:3px 10px;border-radius:999px;">DAY {day_num}</td>
                 </tr>
               </table>
-              <div style="font-size:12px;color:#6b7280;margin-top:2px;">{current_date.isoformat()}</div>
+              <div style="font-size:12px;color:#6b7280;margin-top:2px;">{escape(format_day_range(current_date))}</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
                 {rows_html}
               </table>
