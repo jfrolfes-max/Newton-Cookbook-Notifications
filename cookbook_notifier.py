@@ -36,7 +36,7 @@ CYCLE_DAY_ADJUSTMENT = 1
 # must always be supplied via environment variables / CI secrets.
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL_TO = ["jfrolfes@gmail.com"]#, "clay-smith10@outlook.com"]
+EMAIL_TO = ["jfrolfes@gmail.com", "clay-smith10@outlook.com"]
 MOUNTAIN_TZ = ZoneInfo("America/Denver")  # handles MST/MDT transitions automatically
 
 
