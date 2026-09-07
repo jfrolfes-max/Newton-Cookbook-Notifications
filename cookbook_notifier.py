@@ -40,7 +40,14 @@ EMAIL_TO = ["jfrolfes@gmail.com", "clay-smith10@outlook.com"]
 MOUNTAIN_TZ = ZoneInfo("America/Denver")  # handles MST/MDT transitions automatically
 
 # Gum outputs to call out separately in each email.
-FEATURED_OUTPUTS = ["Perkaholic", "Shopping Free", "Power Vacuum", "Near Death Experience", "Extra Credit"]
+FEATURED_OUTPUTS = [
+    "Perkaholic",
+    "Shopping Free",
+    "Power Vacuum",
+    "Near Death Experience",
+    "Extra Credit",
+    "Reign Drops",
+]
 
 
 def fetch_cycle_rows():
@@ -206,10 +213,9 @@ def format_recipe_html(recipe):
         inputs += f" + {escape(recipe['qty2'])}x {escape(recipe['input2'])}"
     return (
         "<tr>"
-        f'<td style="padding:5px 0;color:#4b5563;font-size:14px;white-space:nowrap;">{inputs}</td>'
-        '<td style="padding:5px 10px;color:#9ca3af;font-size:14px;">&#8594;</td>'
-        '<td style="padding:5px 0;color:#111827;font-size:14px;font-weight:600;">'
-        f'{escape(recipe["qty_out"])}x {escape(recipe["output"])}</td>'
+        f'<td class="in">{inputs}</td>'
+        '<td class="arrow">&#8594;</td>'
+        f'<td class="out">{escape(recipe["qty_out"])}x {escape(recipe["output"])}</td>'
         "</tr>"
     )
 
@@ -220,11 +226,10 @@ def format_featured_recipe_html(label, day_num, recipe):
         inputs += f" + {escape(recipe['qty2'])}x {escape(recipe['input2'])}"
     return (
         "<tr>"
-        f'<td style="padding:5px 0;color:#92400e;font-size:12px;font-weight:700;white-space:nowrap;">{escape(label)} (Day {day_num})</td>'
-        f'<td style="padding:5px 10px;color:#4b5563;font-size:14px;white-space:nowrap;">{inputs}</td>'
-        '<td style="padding:5px 10px;color:#9ca3af;font-size:14px;">&#8594;</td>'
-        '<td style="padding:5px 0;color:#111827;font-size:14px;font-weight:600;">'
-        f'{escape(recipe["qty_out"])}x {escape(recipe["output"])}</td>'
+        f'<td class="day">{escape(label)} (Day {day_num})</td>'
+        f'<td class="in">{inputs}</td>'
+        '<td class="arrow">&#8594;</td>'
+        f'<td class="out">{escape(recipe["qty_out"])}x {escape(recipe["output"])}</td>'
         "</tr>"
     )
 
@@ -239,39 +244,27 @@ def build_recipe_guide_card_html(recipes_by_day, outputs):
         if entries:
             rows_html = "".join(
                 "<tr>"
-                f'<td style="padding:3px 0;color:#4b5563;font-size:12px;white-space:nowrap;">Day {day_num}</td>'
-                f'<td style="padding:3px 10px;color:#4b5563;font-size:14px;">'
-                f'{escape(recipe["qty1"])}x {escape(recipe["input1"])}'
+                f'<td class="guide-day">Day {day_num}</td>'
+                f'<td class="guide-in">{escape(recipe["qty1"])}x {escape(recipe["input1"])}'
                 + (f' + {escape(recipe["qty2"])}x {escape(recipe["input2"])}' if recipe["input2"] else "")
                 + "</td></tr>"
                 for day_num, recipe in entries
             )
         else:
-            rows_html = (
-                '<tr><td style="padding:3px 0;color:#9ca3af;font-size:13px;" colspan="2">'
-                "No recipe found in the current cycle data.</td></tr>"
-            )
-        sections.append(f"""
-        <div style="margin-top:10px;">
-          <div style="font-size:14px;font-weight:700;color:#111827;">{escape(output)}</div>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            {rows_html}
-          </table>
-        </div>
-        """)
+            rows_html = '<tr><td class="guide-empty" colspan="2">No recipe found in the current cycle data.</td></tr>'
+        sections.append(
+            f'<div class="gum"><div class="gum-name">{escape(output)}</div>'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows_html}</table></div>'
+        )
 
-    return f"""
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-           style="background:#f0fdf4;border:1px solid #22c55e;border-radius:10px;margin-bottom:14px;">
-      <tr>
-        <td style="padding:14px 16px;">
-          <div style="font-size:16px;font-weight:700;color:#111827;">&#128218; Gum Recipe Guide</div>
-          <div style="font-size:12px;color:#166534;margin-top:2px;">Every recipe across the full cycle for these gums - watch for these ingredients</div>
-          {''.join(sections)}
-        </td>
-      </tr>
-    </table>
-    """
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card guide">'
+        '<tr><td class="card-inner">'
+        '<div class="title">&#128218; Gum Recipe Guide</div>'
+        '<div class="subtitle guide-subtitle">Every recipe across the full cycle for these gums - watch for these ingredients</div>'
+        f'{"".join(sections)}'
+        "</td></tr></table>"
+    )
 
 
 def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
@@ -282,24 +275,15 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
             for label, current_date, day_num, recipe in featured
         )
     else:
-        featured_rows_html = (
-            '<tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">'
-            "None of the featured gums appear in this window.</td></tr>"
-        )
-    featured_card = f"""
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-           style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;margin-bottom:14px;">
-      <tr>
-        <td style="padding:14px 16px;">
-          <div style="font-size:16px;font-weight:700;color:#111827;">&#11088; Featured Gums</div>
-          <div style="font-size:12px;color:#92400e;margin-top:2px;">{escape(', '.join(FEATURED_OUTPUTS))}</div>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
-            {featured_rows_html}
-          </table>
-        </td>
-      </tr>
-    </table>
-    """
+        featured_rows_html = '<tr><td class="empty">None of the featured gums appear in this window.</td></tr>'
+    featured_card = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card featured">'
+        '<tr><td class="card-inner">'
+        '<div class="title">&#11088; Featured Gums</div>'
+        f'<div class="subtitle featured-subtitle">{escape(", ".join(FEATURED_OUTPUTS))}</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="recipe-table">{featured_rows_html}</table>'
+        "</td></tr></table>"
+    )
 
     recipe_guide_card = build_recipe_guide_card_html(recipes_by_day, FEATURED_OUTPUTS)
 
@@ -313,50 +297,75 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
         rows_html = "".join(
             format_recipe_html(recipe) for recipe in recipes_by_day.get(day_num, [])
         )
-        card_bg = "#eef2ff" if is_today else "#ffffff"
-        border_color = "#6366f1" if is_today else "#e5e7eb"
-        badge_bg = "#6366f1" if is_today else "#9ca3af"
+        card_class = "card today" if is_today else "card"
+        badge_class = "badge today" if is_today else "badge"
 
-        day_cards.append(f"""
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-               style="background:{card_bg};border:1px solid {border_color};border-radius:10px;margin-bottom:14px;">
-          <tr>
-            <td style="padding:14px 16px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="left" style="font-size:16px;font-weight:700;color:#111827;">{escape(label)}</td>
-                  <td align="right" style="font-size:11px;font-weight:700;color:#ffffff;background:{badge_bg};
-                             padding:3px 10px;border-radius:999px;">DAY {day_num}</td>
-                </tr>
-              </table>
-              <div style="font-size:12px;color:#6b7280;margin-top:2px;">{escape(format_day_range(current_date))}</div>
-              <div style="font-size:12px;color:#6b7280;">MT: {escape(format_day_range_mt(current_date))}</div>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
-                {rows_html}
-              </table>
-            </td>
-          </tr>
-        </table>
-        """)
+        day_cards.append(
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="{card_class}">'
+            '<tr><td class="card-inner">'
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+            f'<td align="left" class="day-label">{escape(label)}</td>'
+            f'<td align="right" class="{badge_class}">DAY {day_num}</td>'
+            "</tr></table>"
+            f'<div class="range">{escape(format_day_range(current_date))}</div>'
+            f'<div class="range">MT: {escape(format_day_range_mt(current_date))}</div>'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="recipe-table">{rows_html}</table>'
+            "</td></tr></table>"
+        )
 
     return f"""\
 <html>
-  <head><meta charset="utf-8"></head>
-  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {{ margin:0; padding:0; background:#f3f4f6; font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif; }}
+      .wrap {{ background:#f3f4f6; padding:24px 0; }}
+      .container {{ background:#ffffff; border-radius:12px; overflow:hidden; }}
+      .header {{ background:#111827; padding:20px 24px; }}
+      .brand {{ font-size:18px; font-weight:700; color:#ffffff; margin-left:6px; }}
+      .tagline {{ font-size:13px; color:#9ca3af; margin-top:2px; }}
+      .body {{ padding:20px 20px 8px 20px; }}
+      .card {{ border-radius:10px; margin-bottom:14px; border:1px solid #e5e7eb; background:#ffffff; }}
+      .card.today {{ border-color:#6366f1; background:#eef2ff; }}
+      .card.featured {{ border-color:#f59e0b; background:#fffbeb; }}
+      .card.guide {{ border-color:#22c55e; background:#f0fdf4; }}
+      .card-inner {{ padding:14px 16px; }}
+      .day-label {{ font-size:16px; font-weight:700; color:#111827; }}
+      .title {{ font-size:16px; font-weight:700; color:#111827; }}
+      .subtitle {{ font-size:12px; margin-top:2px; }}
+      .featured-subtitle {{ color:#92400e; }}
+      .guide-subtitle {{ color:#166534; }}
+      .badge {{ font-size:11px; font-weight:700; color:#ffffff; background:#9ca3af; padding:3px 10px; border-radius:999px; }}
+      .badge.today {{ background:#6366f1; }}
+      .range {{ font-size:12px; color:#6b7280; margin-top:2px; }}
+      .recipe-table {{ margin-top:8px; }}
+      .in, .out {{ padding:5px 0; font-size:14px; }}
+      .in {{ color:#4b5563; white-space:nowrap; }}
+      .out {{ color:#111827; font-weight:600; }}
+      .arrow {{ padding:5px 10px; color:#9ca3af; font-size:14px; }}
+      .day {{ padding:5px 0; color:#92400e; font-size:12px; font-weight:700; white-space:nowrap; }}
+      .empty {{ padding:5px 0; color:#6b7280; font-size:13px; }}
+      .gum {{ margin-top:10px; }}
+      .gum-name {{ font-size:14px; font-weight:700; color:#111827; }}
+      .guide-day {{ padding:3px 0; color:#4b5563; font-size:12px; white-space:nowrap; }}
+      .guide-in {{ padding:3px 10px; color:#4b5563; font-size:14px; }}
+      .guide-empty {{ padding:3px 0; color:#9ca3af; font-size:13px; }}
+    </style>
+  </head>
+  <body>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="wrap">
       <tr>
         <td align="center">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-                 style="background:#ffffff;border-radius:12px;overflow:hidden;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="container">
             <tr>
-              <td style="background:#111827;padding:20px 24px;">
+              <td class="header">
                 <span style="font-size:20px;">🧪</span>
-                <span style="font-size:18px;font-weight:700;color:#ffffff;margin-left:6px;">Newton's Cookbook</span>
-                <div style="font-size:13px;color:#9ca3af;margin-top:2px;">Next {num_days} days of recipes</div>
+                <span class="brand">Newton's Cookbook</span>
+                <div class="tagline">Next {num_days} days of recipes</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 20px 8px 20px;">
+              <td class="body">
                 {featured_card}
                 {''.join(day_cards)}
                 {recipe_guide_card}
