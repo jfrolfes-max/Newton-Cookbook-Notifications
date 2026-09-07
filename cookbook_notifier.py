@@ -131,28 +131,37 @@ def format_recipe(recipe):
     return f"{inputs} -> {recipe['qty_out']}x {recipe['output']}"
 
 
+def _normalize_name(name):
+    """Normalize a gum name for comparison (the sheet stores OUTPUT names in ALL CAPS)."""
+    return name.strip().casefold()
+
+
 def find_featured_recipes(recipes_by_day, day1_date, start_date, num_days, outputs):
     """Return (label, current_date, day_num, recipe) for every recipe in the window whose
-    output matches one of `outputs`, in day order."""
+    OUTPUT matches one of `outputs`, in day order."""
+    normalized_outputs = {_normalize_name(name) for name in outputs}
     featured = []
     for i in range(num_days):
         current_date = start_date + timedelta(days=i)
         day_num = cycle_day_for_date(current_date, day1_date)
         label = "Today" if i == 0 else current_date.strftime("%A")
         for recipe in recipes_by_day.get(day_num, []):
-            if recipe["output"] in outputs:
+            if _normalize_name(recipe["output"]) in normalized_outputs:
                 featured.append((label, current_date, day_num, recipe))
     return featured
 
 
 def find_recipes_by_output(recipes_by_day, outputs):
     """Return {output_name: [(day_num, recipe), ...]} across the *entire* 36-day cycle,
-    so every possible way to craft each gum is covered, not just the current 7-day window."""
+    so every possible way to craft each gum is covered, not just the current 7-day window.
+    Every recipe row is checked by its OUTPUT column, never its inputs."""
     by_output = {name: [] for name in outputs}
+    normalized_lookup = {_normalize_name(name): name for name in outputs}
     for day_num in sorted(recipes_by_day):
         for recipe in recipes_by_day[day_num]:
-            if recipe["output"] in by_output:
-                by_output[recipe["output"]].append((day_num, recipe))
+            display_name = normalized_lookup.get(_normalize_name(recipe["output"]))
+            if display_name is not None:
+                by_output[display_name].append((day_num, recipe))
     return by_output
 
 
