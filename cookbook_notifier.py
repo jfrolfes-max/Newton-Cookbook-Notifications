@@ -39,6 +39,9 @@ SMTP_PORT = 587
 EMAIL_TO = ["jfrolfes@gmail.com", "clay-smith10@outlook.com"]
 MOUNTAIN_TZ = ZoneInfo("America/Denver")  # handles MST/MDT transitions automatically
 
+# Gum outputs to call out separately in each email.
+FEATURED_OUTPUTS = ["Perkaholic", "Shopping Free", "Power Vacuum", "Near Death Experience", "Extra Credit"]
+
 
 def fetch_cycle_rows():
     """Download the 'Cycle' sheet and return it as a list of CSV rows (header included)."""
@@ -128,8 +131,43 @@ def format_recipe(recipe):
     return f"{inputs} -> {recipe['qty_out']}x {recipe['output']}"
 
 
+def find_featured_recipes(recipes_by_day, day1_date, start_date, num_days, outputs):
+    """Return (label, current_date, day_num, recipe) for every recipe in the window whose
+    output matches one of `outputs`, in day order."""
+    featured = []
+    for i in range(num_days):
+        current_date = start_date + timedelta(days=i)
+        day_num = cycle_day_for_date(current_date, day1_date)
+        label = "Today" if i == 0 else current_date.strftime("%A")
+        for recipe in recipes_by_day.get(day_num, []):
+            if recipe["output"] in outputs:
+                featured.append((label, current_date, day_num, recipe))
+    return featured
+
+
+def find_recipes_by_output(recipes_by_day, outputs):
+    """Return {output_name: [(day_num, recipe), ...]} across the *entire* 36-day cycle,
+    so every possible way to craft each gum is covered, not just the current 7-day window."""
+    by_output = {name: [] for name in outputs}
+    for day_num in sorted(recipes_by_day):
+        for recipe in recipes_by_day[day_num]:
+            if recipe["output"] in by_output:
+                by_output[recipe["output"]].append((day_num, recipe))
+    return by_output
+
+
 def build_email_body(recipes_by_day, day1_date, start_date, num_days=7):
     lines = []
+
+    featured = find_featured_recipes(recipes_by_day, day1_date, start_date, num_days, FEATURED_OUTPUTS)
+    lines.append("Featured Gums (next {} days)".format(num_days))
+    if featured:
+        for label, current_date, day_num, recipe in featured:
+            lines.append(f"  - [{label}, Day {day_num}] {format_recipe(recipe)}")
+    else:
+        lines.append("  - None of the featured gums appear in this window.")
+    lines.append("")
+
     for i in range(num_days):
         current_date = start_date + timedelta(days=i)
         day_num = cycle_day_for_date(current_date, day1_date)
@@ -139,6 +177,17 @@ def build_email_body(recipes_by_day, day1_date, start_date, num_days=7):
         for recipe in recipes_by_day.get(day_num, []):
             lines.append(f"  - {format_recipe(recipe)}")
         lines.append("")
+
+    recipes_by_output = find_recipes_by_output(recipes_by_day, FEATURED_OUTPUTS)
+    lines.append("Gum Recipe Guide (full cycle - ingredients to watch for)")
+    for output in FEATURED_OUTPUTS:
+        lines.append(f"{output}:")
+        entries = recipes_by_output.get(output, [])
+        if entries:
+            for day_num, recipe in entries:
+                lines.append(f"  - Day {day_num}: {format_recipe(recipe)}")
+        else:
+            lines.append("  - No recipe found for this gum in the current cycle data.")
     return "\n".join(lines).strip()
 
 
@@ -156,7 +205,95 @@ def format_recipe_html(recipe):
     )
 
 
+def format_featured_recipe_html(label, day_num, recipe):
+    inputs = f"{escape(recipe['qty1'])}x {escape(recipe['input1'])}"
+    if recipe["input2"]:
+        inputs += f" + {escape(recipe['qty2'])}x {escape(recipe['input2'])}"
+    return (
+        "<tr>"
+        f'<td style="padding:5px 0;color:#92400e;font-size:12px;font-weight:700;white-space:nowrap;">{escape(label)} (Day {day_num})</td>'
+        f'<td style="padding:5px 10px;color:#4b5563;font-size:14px;white-space:nowrap;">{inputs}</td>'
+        '<td style="padding:5px 10px;color:#9ca3af;font-size:14px;">&#8594;</td>'
+        '<td style="padding:5px 0;color:#111827;font-size:14px;font-weight:600;">'
+        f'{escape(recipe["qty_out"])}x {escape(recipe["output"])}</td>'
+        "</tr>"
+    )
+
+
+def build_recipe_guide_card_html(recipes_by_day, outputs):
+    """Build an HTML card listing every recipe (across the full cycle) that yields each
+    of `outputs`, so the reader knows which ingredients to stockpile."""
+    recipes_by_output = find_recipes_by_output(recipes_by_day, outputs)
+    sections = []
+    for output in outputs:
+        entries = recipes_by_output.get(output, [])
+        if entries:
+            rows_html = "".join(
+                "<tr>"
+                f'<td style="padding:3px 0;color:#4b5563;font-size:12px;white-space:nowrap;">Day {day_num}</td>'
+                f'<td style="padding:3px 10px;color:#4b5563;font-size:14px;">'
+                f'{escape(recipe["qty1"])}x {escape(recipe["input1"])}'
+                + (f' + {escape(recipe["qty2"])}x {escape(recipe["input2"])}' if recipe["input2"] else "")
+                + "</td></tr>"
+                for day_num, recipe in entries
+            )
+        else:
+            rows_html = (
+                '<tr><td style="padding:3px 0;color:#9ca3af;font-size:13px;" colspan="2">'
+                "No recipe found in the current cycle data.</td></tr>"
+            )
+        sections.append(f"""
+        <div style="margin-top:10px;">
+          <div style="font-size:14px;font-weight:700;color:#111827;">{escape(output)}</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            {rows_html}
+          </table>
+        </div>
+        """)
+
+    return f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background:#f0fdf4;border:1px solid #22c55e;border-radius:10px;margin-bottom:14px;">
+      <tr>
+        <td style="padding:14px 16px;">
+          <div style="font-size:16px;font-weight:700;color:#111827;">&#128218; Gum Recipe Guide</div>
+          <div style="font-size:12px;color:#166534;margin-top:2px;">Every recipe across the full cycle for these gums - watch for these ingredients</div>
+          {''.join(sections)}
+        </td>
+      </tr>
+    </table>
+    """
+
+
 def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
+    featured = find_featured_recipes(recipes_by_day, day1_date, start_date, num_days, FEATURED_OUTPUTS)
+    if featured:
+        featured_rows_html = "".join(
+            format_featured_recipe_html(label, day_num, recipe)
+            for label, current_date, day_num, recipe in featured
+        )
+    else:
+        featured_rows_html = (
+            '<tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">'
+            "None of the featured gums appear in this window.</td></tr>"
+        )
+    featured_card = f"""
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;margin-bottom:14px;">
+      <tr>
+        <td style="padding:14px 16px;">
+          <div style="font-size:16px;font-weight:700;color:#111827;">&#11088; Featured Gums</div>
+          <div style="font-size:12px;color:#92400e;margin-top:2px;">{escape(', '.join(FEATURED_OUTPUTS))}</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            {featured_rows_html}
+          </table>
+        </td>
+      </tr>
+    </table>
+    """
+
+    recipe_guide_card = build_recipe_guide_card_html(recipes_by_day, FEATURED_OUTPUTS)
+
     day_cards = []
     for i in range(num_days):
         current_date = start_date + timedelta(days=i)
@@ -211,7 +348,9 @@ def build_email_html(recipes_by_day, day1_date, start_date, num_days=7):
             </tr>
             <tr>
               <td style="padding:20px 20px 8px 20px;">
+                {featured_card}
                 {''.join(day_cards)}
+                {recipe_guide_card}
               </td>
             </tr>
           </table>
